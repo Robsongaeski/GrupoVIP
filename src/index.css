@@ -1,0 +1,334 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* VIPSend Design System - Verde vibrante da marca */
+
+@layer base {
+  :root {
+    --background: 0 0% 98%;
+    --foreground: 150 10% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 150 10% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 150 10% 15%;
+
+    /* Verde VIPSend - mais vibrante e alinhado com a marca */
+    --primary: 145 65% 42%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 150 14% 93%;
+    --secondary-foreground: 150 10% 15%;
+
+    --muted: 150 14% 96%;
+    --muted-foreground: 150 16% 47%;
+
+    --accent: 145 65% 95%;
+    --accent-foreground: 145 65% 32%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 150 20% 91%;
+    --input: 150 20% 91%;
+    --ring: 145 65% 42%;
+
+    --radius: 0.75rem;
+
+    --success: 145 76% 36%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --info: 199 89% 48%;
+    --info-foreground: 0 0% 100%;
+
+    /* Sidebar com verde escuro para contraste com logo branca */
+    --sidebar-background: 145 55% 28%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 0 0% 100%;
+    --sidebar-primary-foreground: 145 55% 28%;
+    --sidebar-accent: 145 55% 24%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 145 55% 35%;
+    --sidebar-ring: 0 0% 100%;
+
+    --gradient-start: 145 65% 45%;
+    --gradient-end: 145 55% 32%;
+  }
+
+  .dark {
+    --background: 150 10% 10%;
+    --foreground: 0 0% 95%;
+
+    --card: 150 10% 14%;
+    --card-foreground: 0 0% 95%;
+
+    --popover: 150 10% 14%;
+    --popover-foreground: 0 0% 95%;
+
+    --primary: 145 65% 48%;
+    --primary-foreground: 150 10% 10%;
+
+    --secondary: 150 10% 20%;
+    --secondary-foreground: 0 0% 95%;
+
+    --muted: 150 10% 20%;
+    --muted-foreground: 150 16% 65%;
+
+    --accent: 145 65% 18%;
+    --accent-foreground: 145 65% 70%;
+
+    --destructive: 0 62% 40%;
+    --destructive-foreground: 0 0% 95%;
+
+    --border: 150 10% 25%;
+    --input: 150 10% 25%;
+    --ring: 145 65% 48%;
+
+    --success: 145 76% 42%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 55%;
+    --warning-foreground: 0 0% 0%;
+
+    --info: 199 89% 55%;
+    --info-foreground: 0 0% 0%;
+
+    /* Sidebar escura no dark mode */
+    --sidebar-background: 150 10% 10%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 145 65% 48%;
+    --sidebar-primary-foreground: 150 10% 10%;
+    --sidebar-accent: 150 10% 18%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 150 10% 25%;
+    --sidebar-ring: 145 65% 48%;
+
+    --gradient-start: 145 65% 48%;
+    --gradient-end: 145 55% 38%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer utilities {
+  .gradient-primary {
+    background: linear-gradient(135deg, hsl(var(--gradient-start)), hsl(var(--gradient-end)));
+  }
+
+  .text-gradient {
+    background: linear-gradient(135deg, hsl(var(--gradient-start)), hsl(var(--gradient-end)));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Shimmer effect for buttons and elements */
+  .shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .shimmer::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.3),
+      transparent
+    );
+    animation: shimmer-slide 2s infinite;
+  }
+
+  @keyframes shimmer-slide {
+    0% { left: -100%; }
+    100% { left: 100%; }
+  }
+
+  /* Animated underline for links */
+  .animated-underline {
+    position: relative;
+  }
+
+  .animated-underline::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: hsl(var(--primary));
+    transition: width 0.3s ease;
+  }
+
+  .animated-underline:hover::after {
+    width: 100%;
+  }
+
+  /* Card hover effect */
+  .card-hover {
+    @apply transition-all duration-300 ease-out;
+  }
+
+  .card-hover:hover {
+    @apply -translate-y-2 shadow-xl;
+  }
+
+  /* Button hover with arrow animation */
+  .btn-arrow .arrow-icon {
+    @apply transition-transform duration-300;
+  }
+
+  .btn-arrow:hover .arrow-icon {
+    @apply translate-x-1;
+  }
+
+  /* Glow effect */
+  .glow {
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.3);
+  }
+
+  .glow-hover {
+    @apply transition-shadow duration-300;
+  }
+
+  .glow-hover:hover {
+    box-shadow: 0 0 30px hsl(var(--primary) / 0.4);
+  }
+
+  /* Gradient border */
+  .gradient-border {
+    position: relative;
+    background: hsl(var(--card));
+    border-radius: var(--radius);
+  }
+
+  .gradient-border::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: calc(var(--radius) + 2px);
+    background: linear-gradient(135deg, hsl(var(--gradient-start)), hsl(var(--gradient-end)));
+    z-index: -1;
+  }
+
+  /* Floating animation variations */
+  .float-delay-1 {
+    animation-delay: 0s;
+  }
+  .float-delay-2 {
+    animation-delay: 2s;
+  }
+  .float-delay-3 {
+    animation-delay: 4s;
+  }
+
+  /* Stagger delay utilities */
+  .stagger-1 { animation-delay: 100ms; }
+  .stagger-2 { animation-delay: 200ms; }
+  .stagger-3 { animation-delay: 300ms; }
+  .stagger-4 { animation-delay: 400ms; }
+  .stagger-5 { animation-delay: 500ms; }
+  .stagger-6 { animation-delay: 600ms; }
+  .stagger-7 { animation-delay: 700ms; }
+  .stagger-8 { animation-delay: 800ms; }
+  .stagger-9 { animation-delay: 900ms; }
+  .stagger-10 { animation-delay: 1000ms; }
+
+  /* Icon spin on hover */
+  .icon-spin-hover {
+    @apply transition-transform duration-500;
+  }
+
+  .icon-spin-hover:hover {
+    transform: rotate(360deg);
+  }
+
+  /* Scale on hover */
+  .scale-hover {
+    @apply transition-transform duration-300;
+  }
+
+  .scale-hover:hover {
+    @apply scale-110;
+  }
+
+  /* Blob background */
+  .blob-bg {
+    filter: blur(60px);
+    opacity: 0.5;
+  }
+
+  /* Glass effect */
+  .glass {
+    @apply bg-background/80 backdrop-blur-md;
+  }
+
+  /* Gradient text animation */
+  .gradient-text-animated {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--gradient-start)),
+      hsl(var(--gradient-end)),
+      hsl(var(--gradient-start))
+    );
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: gradient-shift 3s ease infinite;
+  }
+
+  @keyframes gradient-shift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  html {
+    scroll-behavior: auto;
+  }
+}
+a[href*="lovable.dev"],
+iframe[src*="lovable.dev"],
+div[style*="Edit with Lovable"],
+.lovable-badge {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  z-index: -9999 !important;
+}
