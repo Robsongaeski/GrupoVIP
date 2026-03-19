@@ -78,6 +78,9 @@ interface IntelligentLink {
   pixel_id: string | null;
   facebook_pixel_id: string | null;
   facebook_pixel_event: string | null;
+  link_groups?: { count: number }[];
+  link_manual_groups?: { count: number }[];
+  link_phone_numbers?: { count: number }[];
 }
 
 interface Group {
@@ -215,7 +218,12 @@ export default function Links() {
     try {
       const { data, error } = await supabase
         .from("intelligent_links")
-        .select("*")
+        .select(`
+          *,
+          link_groups(count),
+          link_manual_groups(count),
+          link_phone_numbers(count)
+        `)
         .eq("user_id", effectiveUserId)
         .order("created_at", { ascending: false });
 
@@ -1314,6 +1322,21 @@ export default function Links() {
                     <div className="flex flex-col gap-1 items-end">
                       {getStatusBadge(link.status)}
                       {getModeBadge(link.mode)}
+                      {(() => {
+                        const groupsCount = link.link_groups?.[0]?.count || 0;
+                        const manualCount = link.link_manual_groups?.[0]?.count || 0;
+                        const phoneCount = link.link_phone_numbers?.[0]?.count || 0;
+                        const totalTargets = groupsCount + manualCount + phoneCount;
+                        
+                        if (totalTargets === 0 && !link.redirect_url) {
+                          return (
+                            <Badge variant="destructive" className="bg-orange-500 hover:bg-orange-600 animate-pulse">
+                              Sem Destinos
+                            </Badge>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                   </div>
                 </CardHeader>
