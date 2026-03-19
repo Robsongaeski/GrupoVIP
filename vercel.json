@@ -1,6 +1,5 @@
 {
   "rewrites": [
-    { "source": "/go/:slug", "destination": "https://kwqjgflpphuvmduxukau.supabase.co/functions/v1/smart-redirect?slug=:slug" },
     { "source": "/(.*)", "destination": "/" }
   ],
   "headers": [
