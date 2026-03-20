@@ -71,9 +71,28 @@ export default function AdminConfig() {
   };
 
   const handleSave = async () => {
+    if (providerChanged) {
+      if (!window.confirm("Atenção: Mudar o provedor de WhatsApp ativo é uma ação global e desconectará todas as instâncias existentes dos clientes. Eles precisarão ler o QR Code novamente. Deseja realmente realizar essa troca?")) {
+        return;
+      }
+    }
+
     setSaving(true);
     try {
+      const providerConfig = configs.find(c => c.key === "whatsapp_provider");
+      
+      if (providerChanged && providerConfig) {
+        // Chama a RPC para garantir que mude as configs e derrube as instâncias numa transação segura
+        const { error: rpcError } = await supabase.rpc("admin_toggle_whatsapp_provider", {
+          p_new_provider: providerConfig.value
+        });
+        if (rpcError) throw rpcError;
+      }
+
       for (const config of configs) {
+        // Se já chamou RPC para provider, pula ele na atualização individual
+        if (providerChanged && config.key === "whatsapp_provider") continue;
+
         const { error } = await supabase
           .from("system_config")
           .update({ value: config.value })
@@ -82,6 +101,7 @@ export default function AdminConfig() {
         if (error) throw error;
       }
 
+      setProviderChanged(false);
       toast.success("Configurações salvas com sucesso!");
     } catch (error) {
       console.error("Error saving configs:", error);
@@ -214,6 +234,12 @@ export default function AdminConfig() {
           <p className="text-muted-foreground">
             Configure as credenciais de integração WhatsApp e parâmetros globais
           </p>
+          <div className="mt-4">
+            <Button variant="outline" onClick={() => navigate("/admin/test")} className="gap-2 border-primary text-primary hover:bg-primary/10">
+              <Server className="w-4 h-4" />
+              Acessar Simulador de Disparos (Testes API)
+            </Button>
+          </div>
         </div>
 
         {/* WhatsApp Provider Selection */}

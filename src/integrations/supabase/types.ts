@@ -1809,6 +1809,12 @@ export type Database = {
       }
     }
     Functions: {
+      admin_toggle_whatsapp_provider: {
+        Args: {
+          p_new_provider: string
+        }
+        Returns: undefined
+      }
       can_user_execute_actions: { Args: { _user_id: string }; Returns: boolean }
       check_rate_limit: {
         Args: {

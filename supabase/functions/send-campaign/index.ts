@@ -938,7 +938,8 @@ Deno.serve(async (req) => {
           const availableInstances = instances.filter(i => 
             i.status === "connected" && 
             lockedInstanceIds.has(i.id) &&
-            (instanceFailures[i.id] || 0) < MAX_FAILURES_BEFORE_SKIP
+            (instanceFailures[i.id] || 0) < MAX_FAILURES_BEFORE_SKIP &&
+            (group.instance_id ? i.id === group.instance_id : true)
           );
 
           if (availableInstances.length === 0) {

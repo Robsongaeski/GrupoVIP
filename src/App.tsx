@@ -34,6 +34,7 @@ import AdminClientDetails from "./pages/admin/AdminClientDetails";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminLogs from "./pages/admin/AdminLogs";
 import AdminSecurityTests from "./pages/admin/AdminSecurityTests";
+import AdminApiTest from "./pages/admin/AdminApiTest";
 import AdminSupport from "./pages/admin/AdminSupport";
 import AdminSupportTicket from "./pages/admin/AdminSupportTicket";
 import NotFound from "./pages/NotFound";
@@ -80,6 +81,7 @@ const App = () => (
             <Route path="/admin/config" element={<AdminConfig />} />
             <Route path="/admin/logs" element={<AdminLogs />} />
             <Route path="/admin/security" element={<AdminSecurityTests />} />
+            <Route path="/admin/test" element={<AdminApiTest />} />
             <Route path="/admin/support" element={<AdminSupport />} />
             <Route path="/admin/support/:id" element={<AdminSupportTicket />} />
             <Route path="*" element={<NotFound />} />

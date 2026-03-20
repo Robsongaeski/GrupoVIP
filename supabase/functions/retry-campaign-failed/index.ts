@@ -417,7 +417,10 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      const instance = instances[Math.floor(Math.random() * instances.length)];
+      let instance = instances.find(i => i.id === group.instance_id);
+      if (!instance) {
+        instance = instances[Math.floor(Math.random() * instances.length)];
+      }
       
       try {
         let response: Response | null = null;

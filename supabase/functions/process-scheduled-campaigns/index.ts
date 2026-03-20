@@ -159,6 +159,13 @@ function isCampaignTooOld(campaign: any): { tooOld: boolean; reason?: string } {
     }
   }
 
+  if (campaign.scheduled_at) {
+    const scheduledAt = new Date(campaign.scheduled_at).getTime();
+    if (now - scheduledAt > ONE_HOUR * 2) {
+      return { tooOld: true, reason: `Campaign scheduled for ${Math.round((now - scheduledAt) / 60000)} minutes ago (limit: 120min expire)` };
+    }
+  }
+
   return { tooOld: false };
 }
 
@@ -737,7 +744,8 @@ async function processCampaign(supabase: any, campaign: any, globalApiUrl: strin
           const availableInstances = instances.filter(i => 
             i.status === "connected" && 
             lockedInstanceIds.has(i.id) &&
-            (instanceFailures[i.id] || 0) < MAX_FAILURES_BEFORE_SKIP
+            (instanceFailures[i.id] || 0) < MAX_FAILURES_BEFORE_SKIP &&
+            (group.instance_id ? i.id === group.instance_id : true)
           );
 
           if (availableInstances.length === 0) {

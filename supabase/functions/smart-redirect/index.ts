@@ -373,8 +373,9 @@ Deno.serve(async (req) => {
       return new Response(metaTagsPage, {
         status: 200,
         headers: { 
-          "Content-Type": "text/html; charset=utf-8",
-          "Cache-Control": "public, max-age=3600", // Cache for 1 hour for bots
+          ...corsHeaders,
+          "content-type": "text/html",
+          "cache-control": "public, max-age=3600", // Cache for 1 hour for bots
         }
       });
     }
@@ -661,6 +662,19 @@ Deno.serve(async (req) => {
       const noVacancyMessage = link.no_vacancy_message || "Sem vagas no momento. Tente novamente mais tarde.";
       console.log("No available groups, showing no vacancy message");
       
+      if (formatJson) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: noVacancyMessage,
+          code: "no_vacancy",
+          pixelId: pixelId || null,
+          pixelEvent: pixelEvent,
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, "content-type": "application/json" }
+        });
+      }
+
       return new Response(`
         <!DOCTYPE html>
         <html>
@@ -695,7 +709,10 @@ Deno.serve(async (req) => {
         </html>
       `, {
         status: 200,
-        headers: { "Content-Type": "text/html; charset=utf-8" }
+        headers: { 
+          ...corsHeaders,
+          "content-type": "text/html" 
+        }
       });
     }
 
@@ -748,8 +765,8 @@ Deno.serve(async (req) => {
         status: 200,
         headers: {
           ...corsHeaders,
-          "Content-Type": "application/json",
-          "Cache-Control": "no-cache, no-store, must-revalidate",
+          "content-type": "application/json",
+          "cache-control": "no-cache, no-store, must-revalidate",
         },
       });
     }
@@ -853,8 +870,9 @@ Deno.serve(async (req) => {
       `, {
         status: 200,
         headers: { 
-          "Content-Type": "text/html; charset=utf-8",
-          "Cache-Control": "no-cache, no-store, must-revalidate",
+          ...corsHeaders,
+          "content-type": "text/html",
+          "cache-control": "no-cache, no-store, must-revalidate",
         }
       });
     }
@@ -869,8 +887,9 @@ Deno.serve(async (req) => {
       return new Response(escapePage, {
         status: 200,
         headers: { 
-          "Content-Type": "text/html; charset=utf-8",
-          "Cache-Control": "no-cache, no-store, must-revalidate",
+          ...corsHeaders,
+          "content-type": "text/html",
+          "cache-control": "no-cache, no-store, must-revalidate",
         }
       });
     }
@@ -899,8 +918,9 @@ Deno.serve(async (req) => {
       `, {
         status: 200,
         headers: { 
-          "Content-Type": "text/html; charset=utf-8",
-          "Cache-Control": "no-cache, no-store, must-revalidate",
+          ...corsHeaders,
+          "content-type": "text/html",
+          "cache-control": "no-cache, no-store, must-revalidate",
         }
       });
     }
@@ -909,10 +929,11 @@ Deno.serve(async (req) => {
     return new Response(null, {
       status: 302,
       headers: {
-        "Location": optimizedUrl,
-        "Cache-Control": "no-cache, no-store, must-revalidate",
-        "Pragma": "no-cache",
-        "Expires": "0",
+        ...corsHeaders,
+        "location": optimizedUrl,
+        "cache-control": "no-cache, no-store, must-revalidate",
+        "pragma": "no-cache",
+        "expires": "0",
       },
     });
   } catch (error) {

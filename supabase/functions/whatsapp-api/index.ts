@@ -709,8 +709,8 @@ async function getSystemConfig(supabase: any, key: string): Promise<string> {
   return data?.value || "";
 }
 
-async function getWhatsAppConfig(supabase: any): Promise<WhatsAppConfig> {
-  const provider = (await getSystemConfig(supabase, "whatsapp_provider")) as "evolution" | "uazapi" || "evolution";
+async function getWhatsAppConfig(supabase: any, providerOverride?: "evolution" | "uazapi"): Promise<WhatsAppConfig> {
+  const provider = providerOverride || (await getSystemConfig(supabase, "whatsapp_provider")) as "evolution" | "uazapi" || "evolution";
   
   if (provider === "uazapi") {
     const subdomain = await getSystemConfig(supabase, "uazapi_subdomain");
@@ -767,6 +767,7 @@ interface WhatsAppApiRequest {
   apiUrl?: string;
   apiKey?: string;
   provider?: "evolution" | "uazapi";
+  providerOverride?: "evolution" | "uazapi";
   // For sending messages
   text?: string;
   media?: MediaPayload;
@@ -809,7 +810,7 @@ Deno.serve(async (req) => {
     console.log(`WhatsApp API action: ${body.action} by user ${user.id}`);
 
     // Get WhatsApp config and create adapter
-    const config = await getWhatsAppConfig(supabase);
+    const config = await getWhatsAppConfig(supabase, body.providerOverride);
     const adapter = createAdapter(config);
     console.log(`Using provider: ${config.provider}`);
 
