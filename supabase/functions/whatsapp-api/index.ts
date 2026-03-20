@@ -12,6 +12,7 @@ interface WhatsAppConfig {
   baseUrl: string;
   apiKey: string;
   adminToken?: string;
+  instanceToken?: string;
 }
 
 interface CreateInstanceResponse {
@@ -374,6 +375,7 @@ class EvolutionAdapter implements IWhatsAppAdapter {
 class UazapiAdapter implements IWhatsAppAdapter {
   private baseUrl: string;
   private adminToken: string;
+  private instanceToken?: string;
 
   constructor(config: WhatsAppConfig) {
     // UAZAPI uses subdomain-based URLs: https://{subdomain}.uazapi.com
@@ -391,6 +393,7 @@ class UazapiAdapter implements IWhatsAppAdapter {
     
     this.baseUrl = `https://${subdomain}.uazapi.com`;
     this.adminToken = config.adminToken || config.apiKey;
+    this.instanceToken = config.instanceToken;
     
     console.log("UazapiAdapter initialized with baseUrl:", this.baseUrl);
   }
@@ -472,11 +475,24 @@ class UazapiAdapter implements IWhatsAppAdapter {
   }
 
   async connectInstance(name: string): Promise<ConnectResponse> {
-    const response = await this.request(`/instance/connect/${name}`, { method: "GET" });
+    let response;
+    
+    if (this.instanceToken) {
+        response = await this.requestWithInstanceToken(this.instanceToken, "/instance/connect", { 
+            method: "POST"
+        });
+    } else {
+        response = await this.requestWithAdminToken("/instance/connect", { 
+            method: "POST",
+            body: JSON.stringify({ instanceName: name })
+        });
+    }
+    
     const data = await response.json();
+    console.log("UAZAPI connectInstance response:", JSON.stringify(data));
 
     // Check if already connected
-    if (data.status === "CONNECTED" || data.state === "open") {
+    if (data.status === "CONNECTED" || data.state === "open" || data.status === "connected") {
       return { success: true, status: "connected", message: "Já conectado!" };
     }
 
@@ -496,7 +512,12 @@ class UazapiAdapter implements IWhatsAppAdapter {
   }
 
   async getInstanceStatus(name: string): Promise<StatusResponse> {
-    const response = await this.request(`/instance/status/${name}`, { method: "GET" });
+    let response;
+    if (this.instanceToken) {
+        response = await this.requestWithInstanceToken(this.instanceToken, `/instance/status`, { method: "GET" });
+    } else {
+        response = await this.requestWithAdminToken(`/instance/status?instanceName=${name}`, { method: "GET" });
+    }
     const data = await response.json();
 
     if (!response.ok) {
@@ -524,15 +545,22 @@ class UazapiAdapter implements IWhatsAppAdapter {
   }
 
   async sendTextMessage(instanceName: string, groupId: string, text: string): Promise<SendResponse> {
-    // UAZAPI uses instance token in header, get it from the instance data
-    const response = await this.request(`/message/text`, {
-      method: "POST",
-      body: JSON.stringify({ 
-        phone: groupId,
-        message: text,
-        instanceName 
-      }),
-    });
+    let response;
+    if (this.instanceToken) {
+        response = await this.requestWithInstanceToken(this.instanceToken, "/message/text", {
+            method: "POST",
+            body: JSON.stringify({ phone: groupId, message: text })
+        });
+    } else {
+        response = await this.requestWithAdminToken(`/message/text`, {
+          method: "POST",
+          body: JSON.stringify({ 
+            phone: groupId,
+            message: text,
+            instanceName 
+          }),
+        });
+    }
 
     const data = await response.json();
     return {
@@ -760,6 +788,7 @@ interface WhatsAppApiRequest {
     | "send-poll";
   instanceId?: string;
   instanceName?: string;
+  instanceToken?: string;
   onlyAdmin?: boolean;
   groupId?: string;
   whatsappGroupId?: string;
@@ -809,8 +838,26 @@ Deno.serve(async (req) => {
     const body: WhatsAppApiRequest = await req.json();
     console.log(`WhatsApp API action: ${body.action} by user ${user.id}`);
 
+    // Resolve Instance Token from DB if not provided and we have a name
+    let instanceToken = body.instanceToken;
+    if (!instanceToken && (body.instanceName || body.instanceId)) {
+        const query = supabase.from("whatsapp_instances").select("instance_token");
+        if (body.instanceId) {
+            query.eq("id", body.instanceId);
+        } else {
+            query.eq("instance_name", body.instanceName);
+        }
+        const { data: instData } = await query.single();
+        if (instData?.instance_token) {
+            instanceToken = instData.instance_token;
+        }
+    }
+
     // Get WhatsApp config and create adapter
     const config = await getWhatsAppConfig(supabase, body.providerOverride);
+    if (instanceToken) {
+        config.instanceToken = instanceToken;
+    }
     const adapter = createAdapter(config);
     console.log(`Using provider: ${config.provider}`);
 

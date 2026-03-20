@@ -20,6 +20,7 @@ export default function AdminApiTest() {
   
   // Instance state
   const [instanceName, setInstanceName] = useState("");
+  const [instanceToken, setInstanceToken] = useState("");
   const [qrCode, setQrCode] = useState("");
   const [status, setStatus] = useState<string>("disconnected");
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -56,8 +57,12 @@ export default function AdminApiTest() {
       if (error) throw new Error(error.message);
       if (!data.success) throw new Error(data.error || "Erro ao criar instância");
 
+      if (data.instanceToken) {
+        setInstanceToken(data.instanceToken);
+      }
+
       toast.success("Instância de teste criada. Solicitando conexão...");
-      await handleConnectInstance(newName);
+      await handleConnectInstance(newName, data.instanceToken);
 
     } catch (err: any) {
       console.error(err);
@@ -68,13 +73,14 @@ export default function AdminApiTest() {
   };
 
   // Handle get connection / QR
-  const handleConnectInstance = async (name: string) => {
+  const handleConnectInstance = async (name: string, tokenOverride?: string) => {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("whatsapp-api", {
         body: { 
           action: "connect", 
           instanceName: name,
+          instanceToken: tokenOverride || instanceToken,
           providerOverride: provider 
         }
       });
@@ -107,6 +113,7 @@ export default function AdminApiTest() {
         body: { 
           action: "status", 
           instanceName: name,
+          instanceToken: instanceToken,
           providerOverride: provider 
         }
       });
@@ -172,6 +179,7 @@ export default function AdminApiTest() {
         body: { 
           action: "send-text", 
           instanceName,
+          instanceToken: instanceToken,
           groupId: targetNumber,
           text: messageText,
           providerOverride: provider 
