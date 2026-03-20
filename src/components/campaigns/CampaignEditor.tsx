@@ -60,6 +60,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { useImpersonation } from "@/contexts/ImpersonationContext";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { CampaignItemEditor, CampaignItem } from "./CampaignItemEditor";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
@@ -111,6 +112,7 @@ export default function CampaignEditor() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { effectiveUserId } = useImpersonation();
   const isNew = id === "new";
 
   const [campaign, setCampaign] = useState<Campaign | null>(null);
@@ -182,13 +184,13 @@ export default function CampaignEditor() {
               whatsapp_instances (id, name, nickname)
             )
           `)
-          .eq("user_id", user?.id)
+          .eq("user_id", effectiveUserId)
           .eq("is_active", true)
           .order("name"),
         supabase
           .from("whatsapp_instances")
           .select("id, name, nickname, status")
-          .eq("user_id", user?.id)
+          .eq("user_id", effectiveUserId)
           .eq("status", "connected")
           .order("name"),
       ]);
@@ -484,7 +486,7 @@ export default function CampaignEditor() {
         const { data: newCampaign, error: createError } = await supabase
           .from("campaigns")
           .insert({
-            user_id: user!.id,
+            user_id: effectiveUserId,
             name: formData.name,
             description: formData.description || null,
             message_content: items[0]?.text_content || "",
@@ -958,7 +960,7 @@ export default function CampaignEditor() {
                           id="delay-groups"
                           type="number"
                           min={1}
-                          max={300}
+                          max={3600}
                           value={formData.delay_between_groups}
                           onChange={(e) =>
                             setFormData({
@@ -967,6 +969,12 @@ export default function CampaignEditor() {
                             })
                           }
                         />
+                        {formData.delay_between_groups > 60 && (
+                          <p className="text-[10px] text-orange-500 flex items-center gap-1 mt-1 leading-tight">
+                            <AlertTriangle className="h-3 w-3 shrink-0" />
+                            <span>Delays &gt; 60s podem causar timeout na execução automática.</span>
+                          </p>
+                        )}
                       </div>
                     </div>
                   </CardContent>
