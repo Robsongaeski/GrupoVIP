@@ -444,6 +444,8 @@ class UazapiAdapter implements IWhatsAppAdapter {
       method: "POST",
       body: JSON.stringify({
         instanceName: name,
+        Name: name, // UAZAPI requires 'Name' or 'name' alongside 'instanceName'
+        name: name
       }),
     });
 
@@ -908,36 +910,49 @@ Deno.serve(async (req) => {
 
       case "connect":
       case "qrcode": {
-        const { data: instance, error } = await supabase
-          .from("whatsapp_instances")
-          .select("*")
-          .eq("id", body.instanceId)
-          .eq("user_id", user.id)
-          .single();
+        let instanceName = body.instanceName;
+        
+        // Only load from DB if instanceId is provided
+        if (body.instanceId) {
+          const { data: instance, error } = await supabase
+            .from("whatsapp_instances")
+            .select("*")
+            .eq("id", body.instanceId)
+            .eq("user_id", user.id)
+            .single();
 
-        if (error || !instance) {
-          throw new Error("Instância não encontrada");
+          if (error || !instance) {
+            throw new Error("Instância não encontrada no banco");
+          }
+          instanceName = instance.instance_name;
         }
 
-        const result = await adapter.connectInstance(instance.instance_name);
+        if (!instanceName) {
+          throw new Error("Nome da instância é obrigatório");
+        }
 
-        if (result.status === "connected") {
-          await supabase
-            .from("whatsapp_instances")
-            .update({ 
-              status: "connected",
-              qr_code: null,
-              last_connected_at: new Date().toISOString()
-            })
-            .eq("id", body.instanceId);
-        } else if (result.qrcode) {
-          await supabase
-            .from("whatsapp_instances")
-            .update({ 
-              qr_code: result.qrcode,
-              status: "qr_pending"
-            })
-            .eq("id", body.instanceId);
+        const result = await adapter.connectInstance(instanceName);
+
+        // Update DB only if we loaded from DB
+        if (body.instanceId) {
+          if (result.status === "connected") {
+            await supabase
+              .from("whatsapp_instances")
+              .update({ 
+                status: "connected",
+                qr_code: null,
+                last_connected_at: new Date().toISOString()
+              })
+              .eq("id", body.instanceId);
+          } else if (result.qrcode) {
+            await supabase
+              .from("whatsapp_instances")
+              .update({ 
+                qr_code: result.qrcode,
+                status: "qr_pending"
+              })
+              .eq("id", body.instanceId);
+          }
         }
 
         return new Response(JSON.stringify({ 
@@ -950,23 +965,34 @@ Deno.serve(async (req) => {
       }
 
       case "status": {
-        const { data: instance, error } = await supabase
-          .from("whatsapp_instances")
-          .select("*")
-          .eq("id", body.instanceId)
-          .eq("user_id", user.id)
-          .single();
+        let instanceName = body.instanceName;
+        let phoneNumberFromDb = null;
 
-        if (error || !instance) {
-          throw new Error("Instância não encontrada");
+        if (body.instanceId) {
+          const { data: instance, error } = await supabase
+            .from("whatsapp_instances")
+            .select("*")
+            .eq("id", body.instanceId)
+            .eq("user_id", user.id)
+            .single();
+
+          if (error || !instance) {
+            throw new Error("Instância não encontrada no banco");
+          }
+          instanceName = instance.instance_name;
+          phoneNumberFromDb = instance.phone_number;
         }
 
-        const result = await adapter.getInstanceStatus(instance.instance_name);
+        if (!instanceName) {
+            throw new Error("Nome da instância é obrigatório");
+        }
 
-        // If instance not found, try to recreate
-        if (!result.success) {
+        const result = await adapter.getInstanceStatus(instanceName);
+
+        // If instance not found and we are tied to DB, try to recreate
+        if (!result.success && body.instanceId) {
           console.log("Instance not found in API, recreating...");
-          const createResult = await adapter.createInstance(instance.instance_name);
+          const createResult = await adapter.createInstance(instanceName);
           
           if (createResult.success) {
             await supabase
@@ -985,21 +1011,23 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Get phone number if connected but not stored
-        let phoneNumber = instance.phone_number;
-        if (result.status === "connected" && !phoneNumber) {
-          phoneNumber = result.phoneNumber || await adapter.getInstancePhoneNumber(instance.instance_name);
-        }
+        if (body.instanceId) {
+            // Get phone number if connected but not stored
+            let phoneNumber = phoneNumberFromDb;
+            if (result.status === "connected" && !phoneNumber) {
+              phoneNumber = result.phoneNumber || await adapter.getInstancePhoneNumber(instanceName);
+            }
 
-        await supabase
-          .from("whatsapp_instances")
-          .update({ 
-            status: result.status,
-            phone_number: phoneNumber || instance.phone_number,
-            last_connected_at: result.status === "connected" ? new Date().toISOString() : instance.last_connected_at,
-            qr_code: result.status === "connected" ? null : instance.qr_code
-          })
-          .eq("id", body.instanceId);
+            await supabase
+              .from("whatsapp_instances")
+              .update({ 
+                status: result.status,
+                phone_number: phoneNumber || phoneNumberFromDb,
+                ...(result.status === "connected" ? { last_connected_at: new Date().toISOString() } : {}),
+                ...(result.status === "connected" ? { qr_code: null } : {})
+              })
+              .eq("id", body.instanceId);
+        }
 
         return new Response(JSON.stringify({ success: true, status: result.status, raw: result.raw }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },

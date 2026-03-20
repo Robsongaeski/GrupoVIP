@@ -43,7 +43,6 @@ export default function AdminApiTest() {
     
     // Generate isolated instance name
     const newName = `test_simulador_${Math.floor(Math.random() * 10000)}`;
-    setInstanceName(newName);
 
     try {
       const { data, error } = await supabase.functions.invoke("whatsapp-api", {
@@ -60,12 +59,14 @@ export default function AdminApiTest() {
       if (data.instanceToken) {
         setInstanceToken(data.instanceToken);
       }
+      
+      setInstanceName(newName); // Only set if successful
 
       toast.success("Instância de teste criada. Solicitando conexão...");
       await handleConnectInstance(newName, data.instanceToken);
 
     } catch (err: any) {
-      console.error(err);
+      console.error("Criar instância erro:", err);
       toast.error(err.message || "Falha ao criar instância.");
     } finally {
       setLoading(false);
