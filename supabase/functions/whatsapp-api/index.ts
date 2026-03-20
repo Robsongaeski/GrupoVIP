@@ -479,7 +479,8 @@ class UazapiAdapter implements IWhatsAppAdapter {
     
     if (this.instanceToken) {
         response = await this.requestWithInstanceToken(this.instanceToken, "/instance/connect", { 
-            method: "POST"
+            method: "POST",
+            body: JSON.stringify({})
         });
     } else {
         response = await this.requestWithAdminToken("/instance/connect", { 
@@ -491,23 +492,20 @@ class UazapiAdapter implements IWhatsAppAdapter {
     const data = await response.json();
     console.log("UAZAPI connectInstance response:", JSON.stringify(data));
 
-    // Check if already connected
-    if (data.status === "CONNECTED" || data.state === "open" || data.status === "connected") {
+    const status = data.status || data.instance?.status || "";
+    if (status === "connected" || status === "CONNECTED") {
       return { success: true, status: "connected", message: "Já conectado!" };
     }
 
-    // Extract QR code - UAZAPI may return it differently
-    let qrCodeBase64 = null;
-    if (data.qrcode) {
-      qrCodeBase64 = data.qrcode.replace(/^data:image\/\w+;base64,/, "");
-    } else if (data.base64) {
-      qrCodeBase64 = data.base64.replace(/^data:image\/\w+;base64,/, "");
+    let qrcode = data.qrcode || data.instance?.qrcode || data.base64 || "";
+    if (qrcode && !qrcode.startsWith("data:")) {
+      qrcode = `data:image/png;base64,${qrcode}`;
     }
 
     return {
       success: true,
-      qrcode: qrCodeBase64 || undefined,
-      status: qrCodeBase64 ? "qr_pending" : "connecting",
+      qrcode: qrcode || undefined,
+      status: qrcode ? "qr_pending" : "connecting",
     };
   }
 
@@ -524,17 +522,17 @@ class UazapiAdapter implements IWhatsAppAdapter {
       return { success: false, status: "disconnected", raw: data };
     }
 
+    const stateValue = data.status || data.instance?.status || data.state || "";
     let status: StatusResponse["status"] = "disconnected";
-    const stateValue = data.status || data.state || "";
     
-    if (stateValue === "CONNECTED" || stateValue === "open") status = "connected";
+    if (stateValue === "CONNECTED" || stateValue === "open" || stateValue === "connected") status = "connected";
     else if (stateValue === "CONNECTING" || stateValue === "connecting") status = "connecting";
     else if (stateValue === "QRCODE" || stateValue === "qr_pending") status = "qr_pending";
     
     return { 
       success: true, 
       status, 
-      phoneNumber: data.phoneNumber || data.phone,
+      phoneNumber: data.instance?.number || data.instance?.phone || data.phoneNumber || data.phone,
       raw: data 
     };
   }
