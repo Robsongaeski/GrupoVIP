@@ -42,12 +42,14 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
+import { cn } from "@/lib/utils";
 import {
   Loader2,
   Search,
   MoreVertical,
   UserCheck,
   UserX,
+  User,
   Eye,
   Users,
   Smartphone,
@@ -57,6 +59,7 @@ import {
   CreditCard,
   RefreshCw,
   LogIn,
+  DollarSign,
 } from "lucide-react";
 
 interface Client {
@@ -67,6 +70,8 @@ interface Client {
   subscription_status: string | null;
   suspended_at: string | null;
   subscription_expires_at: string | null;
+  phone: string | null;
+  cpf_cnpj: string | null;
   // Stats
   instances_count: number;
   groups_count: number;
@@ -109,6 +114,18 @@ export default function AdminClients() {
   const [expiresAt, setExpiresAt] = useState<string>("");
   const [trialDays, setTrialDays] = useState<number>(0);
 
+  // Edit profile dialog
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
+  const [editProfileName, setEditProfileName] = useState("");
+  const [editProfilePhone, setEditProfilePhone] = useState("");
+  const [editProfileCpfCnpj, setEditProfileCpfCnpj] = useState("");
+
+  // Add payment dialog
+  const [addPaymentOpen, setAddPaymentOpen] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("manual");
+  const [paymentNote, setPaymentNote] = useState("");
+
   useEffect(() => {
     if (!authLoading && !user) {
       navigate("/auth");
@@ -142,7 +159,7 @@ export default function AdminClients() {
       // Fetch profiles with subscription info
       const { data: profiles, error: profilesError } = await supabase
         .from("profiles")
-        .select("id, email, full_name, created_at, subscription_status, suspended_at, subscription_expires_at")
+        .select("id, email, full_name, created_at, subscription_status, suspended_at, subscription_expires_at, phone, cpf_cnpj")
         .order("created_at", { ascending: false });
 
       if (profilesError) throw profilesError;
@@ -482,14 +499,88 @@ export default function AdminClients() {
         action: "mark_as_paid",
         target_type: "user",
         target_id: client.id,
-        details: { email: client.email },
+        details: { email: client.email, quick_action: true },
       });
 
-      toast.success("Pagamento registrado com sucesso!");
+      toast.success("Pagamento de 30 dias registrado com sucesso!");
       fetchClients();
     } catch (error) {
       console.error("Error marking as paid:", error);
       toast.error("Erro ao registrar pagamento");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleUpdateProfile = async () => {
+    if (!selectedClient) return;
+    setActionLoading(selectedClient.id);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          full_name: editProfileName || null,
+          phone: editProfilePhone || null,
+          cpf_cnpj: editProfileCpfCnpj || null,
+        })
+        .eq("id", selectedClient.id);
+
+      if (error) throw error;
+
+      await supabase.from("admin_audit_logs").insert({
+        admin_id: user!.id,
+        action: "update_client_profile",
+        target_type: "user",
+        target_id: selectedClient.id,
+        details: { email: selectedClient.email, changes: { full_name: editProfileName } },
+      });
+
+      toast.success("Perfil atualizado com sucesso!");
+      setEditProfileOpen(false);
+      fetchClients();
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      toast.error("Erro ao atualizar perfil");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleLaunchPayment = async () => {
+    if (!selectedClient || !paymentAmount) return;
+    setActionLoading(selectedClient.id);
+    try {
+      const amount = parseFloat(paymentAmount);
+      const { error } = await supabase.from("payments").insert({
+        user_id: selectedClient.id,
+        external_payment_id: `MANUAL-${Date.now()}`,
+        amount,
+        status: "approved",
+        payment_method: paymentMethod,
+        payment_type: "manual",
+        payer_email: selectedClient.email,
+        paid_at: new Date().toISOString(),
+      });
+
+      if (error) throw error;
+
+      // Log action
+      await supabase.from("admin_audit_logs").insert({
+        admin_id: user!.id,
+        action: "add_manual_payment",
+        target_type: "user",
+        target_id: selectedClient.id,
+        details: { email: selectedClient.email, amount, method: paymentMethod, note: paymentNote },
+      });
+
+      toast.success("Pagamento manual registrado!");
+      setAddPaymentOpen(false);
+      setPaymentAmount("");
+      setPaymentNote("");
+      fetchClients();
+    } catch (error) {
+      console.error("Error launching payment:", error);
+      toast.error("Erro ao lançar pagamento");
     } finally {
       setActionLoading(null);
     }
@@ -562,16 +653,17 @@ export default function AdminClients() {
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Plano</TableHead>
-                    <TableHead className="text-center">Instâncias</TableHead>
-                    <TableHead className="text-center">Grupos</TableHead>
-                    <TableHead className="text-center">Campanhas</TableHead>
-                    <TableHead className="text-center">Links</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
+                    <TableRow>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Plano</TableHead>
+                      <TableHead>Vencimento</TableHead>
+                      <TableHead className="text-center">Instâncias</TableHead>
+                      <TableHead className="text-center">Grupos</TableHead>
+                      <TableHead className="text-center">Campanhas</TableHead>
+                      <TableHead className="text-center">Links</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
+                    </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredClients.length === 0 ? (
@@ -597,6 +689,19 @@ export default function AdminClients() {
                         <TableCell>
                           <span className="text-sm">
                             {client.subscription?.plan_name || "Sem plano"}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className={cn(
+                            "text-sm font-medium",
+                            (client.subscription?.expires_at || client.subscription_expires_at) && 
+                            new Date(client.subscription?.expires_at || client.subscription_expires_at!) < new Date() 
+                              ? "text-destructive" 
+                              : "text-muted-foreground"
+                          )}>
+                            {client.subscription?.expires_at || client.subscription_expires_at
+                              ? new Date(client.subscription?.expires_at || client.subscription_expires_at!).toLocaleDateString("pt-BR")
+                              : "-"}
                           </span>
                         </TableCell>
                         <TableCell className="text-center">
@@ -647,6 +752,30 @@ export default function AdminClients() {
                               }}>
                                 <LogIn className="mr-2 h-4 w-4" />
                                 Acessar como cliente
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => {
+                                setSelectedClient(client);
+                                setEditProfileName(client.full_name || "");
+                                setEditProfilePhone(client.phone || "");
+                                setEditProfileCpfCnpj(client.cpf_cnpj || "");
+                                setEditProfileOpen(true);
+                              }}>
+                                <User className="mr-2 h-4 w-4" />
+                                Editar Cadastro
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openEditSubscription(client)}>
+                                <CreditCard className="mr-2 h-4 w-4" />
+                                Editar Plano / Vencimento
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => {
+                                setSelectedClient(client);
+                                setPaymentAmount("");
+                                setPaymentNote("");
+                                setAddPaymentOpen(true);
+                              }}>
+                                <DollarSign className="mr-2 h-4 w-4" />
+                                Lançar Pagamento
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem onClick={() => handleAddTrialDays(client, 7)}>
@@ -905,6 +1034,120 @@ export default function AdminClients() {
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 )}
                 {editSubClient?.subscription ? "Salvar Alterações" : "Cadastrar Assinatura"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Profile Dialog */}
+        <Dialog open={editProfileOpen} onOpenChange={setEditProfileOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Editar Cadastro</DialogTitle>
+              <DialogDescription>
+                {selectedClient?.email}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">Nome Completo</Label>
+                <Input
+                  id="edit-name"
+                  value={editProfileName}
+                  onChange={(e) => setEditProfileName(e.target.value)}
+                  placeholder="Nome do cliente"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-phone">Telefone</Label>
+                <Input
+                  id="edit-phone"
+                  value={editProfilePhone}
+                  onChange={(e) => setEditProfilePhone(e.target.value)}
+                  placeholder="Ex: 5511999999999"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-cpf">CPF / CNPJ</Label>
+                <Input
+                  id="edit-cpf"
+                  value={editProfileCpfCnpj}
+                  onChange={(e) => setEditProfileCpfCnpj(e.target.value)}
+                  placeholder="000.000.000-00"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditProfileOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleUpdateProfile} disabled={actionLoading === selectedClient?.id}>
+                {actionLoading === selectedClient?.id && (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                )}
+                Salvar Alterações
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Payment Dialog */}
+        <Dialog open={addPaymentOpen} onOpenChange={setAddPaymentOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Lançar Pagamento Manual</DialogTitle>
+              <DialogDescription>
+                Registre um pagamento recebido por fora do sistema para {selectedClient?.email}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="payment-amount">Valor (R$)</Label>
+                <Input
+                  id="payment-amount"
+                  type="number"
+                  step="0.01"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Forma de Pagamento</Label>
+                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a forma" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="manual">Dinheiro / Manual</SelectItem>
+                    <SelectItem value="pix">PIX</SelectItem>
+                    <SelectItem value="bank_transfer">Transferência</SelectItem>
+                    <SelectItem value="credit_card">Cartão (Manual)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="payment-note">Observação</Label>
+                <Input
+                  id="payment-note"
+                  value={paymentNote}
+                  onChange={(e) => setPaymentNote(e.target.value)}
+                  placeholder="Opcional: Ex: Pago via WhatsApp"
+                />
+              </div>
+              <div className="p-3 rounded-lg bg-muted text-xs text-muted-foreground italic">
+                Nota: Lançar um pagamento aqui registra a transação financeira, mas NÃO altera automaticamente a validade do plano. Para alterar a validade, use "Editar Plano / Vencimento".
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAddPaymentOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleLaunchPayment} disabled={actionLoading === selectedClient?.id || !paymentAmount}>
+                {actionLoading === selectedClient?.id && (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                )}
+                Confirmar Pagamento
               </Button>
             </DialogFooter>
           </DialogContent>
