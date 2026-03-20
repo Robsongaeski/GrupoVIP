@@ -92,7 +92,12 @@ export default function AdminApiTest() {
         toast.success("Instância já está conectada!");
         checkStatus(name);
       } else if (data.qrcode) {
-        setQrCode(data.qrcode);
+        // Ensure QR code is a valid data URI
+        let qrcode = data.qrcode;
+        if (qrcode && typeof qrcode === "string" && !qrcode.startsWith("data:")) {
+          qrcode = `data:image/png;base64,${qrcode}`;
+        }
+        setQrCode(qrcode);
         setStatus("qr_pending");
       } else {
         setStatus(data.status || "connecting");

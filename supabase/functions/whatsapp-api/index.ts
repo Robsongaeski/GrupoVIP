@@ -489,8 +489,15 @@ class UazapiAdapter implements IWhatsAppAdapter {
         });
     }
     
-    const data = await response.json();
-    console.log("UAZAPI connectInstance response:", JSON.stringify(data));
+    const text = await response.text();
+    console.log("UAZAPI connectInstance response text:", text);
+    
+    let data;
+    try {
+        data = JSON.parse(text);
+    } catch (e) {
+        return { success: false, message: `UAZAPI retornou resposta inválida (${response.status})` };
+    }
 
     const status = data.status || data.instance?.status || "";
     if (status === "connected" || status === "CONNECTED") {
