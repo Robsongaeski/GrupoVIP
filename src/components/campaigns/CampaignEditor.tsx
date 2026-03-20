@@ -98,6 +98,7 @@ interface Group {
   id: string;
   name: string;
   member_count: number;
+  instance_id?: string | null;
   group_instances?: GroupInstance[];
 }
 
@@ -152,7 +153,7 @@ export default function CampaignEditor() {
     if (user) {
       fetchData();
     }
-  }, [user, id]);
+  }, [user, id, effectiveUserId]);
 
   // Auto-save draft to sessionStorage
   useEffect(() => {
@@ -177,7 +178,7 @@ export default function CampaignEditor() {
         supabase
           .from("groups")
           .select(`
-            id, name, member_count,
+            id, name, member_count, instance_id,
             group_instances (
               instance_id,
               is_admin,
@@ -612,7 +613,10 @@ export default function CampaignEditor() {
     const unreachableGroups: Group[] = [];
     
     for (const group of selectedGroupDetails) {
-      const groupInstanceIds = group.group_instances?.map(gi => gi.instance_id) || [];
+      const groupInstanceIds = [
+        ...(group.group_instances?.map(gi => gi.instance_id) || []),
+        ...(group.instance_id ? [group.instance_id] : [])
+      ];
       const hasSelectedInstance = selectedInstances.some(instId => groupInstanceIds.includes(instId));
       
       if (hasSelectedInstance) {
@@ -1375,7 +1379,10 @@ export default function CampaignEditor() {
                   </p>
                 ) : (
                   groups.map((group) => {
-                    const groupInstanceIds = group.group_instances?.map(gi => gi.instance_id) || [];
+                    const groupInstanceIds = [
+                      ...(group.group_instances?.map(gi => gi.instance_id) || []),
+                      ...(group.instance_id ? [group.instance_id] : [])
+                    ];
                     const hasSelectedInstance = selectedInstances.length === 0 || 
                       selectedInstances.some(instId => groupInstanceIds.includes(instId));
                     const instanceNames = group.group_instances
