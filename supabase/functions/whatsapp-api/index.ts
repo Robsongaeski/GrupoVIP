@@ -477,21 +477,13 @@ class UazapiAdapter implements IWhatsAppAdapter {
   }
 
   async connectInstance(name: string): Promise<ConnectResponse> {
-    let response;
+    // We use GET /instance/connect with admintoken since it reliably returns the QR code
+    // compared to POST /instance/connect which sometimes only returns state.
+    const response = await this.request(`/instance/connect/${name}`, { 
+        method: "GET"
+    });
     
-    if (this.instanceToken) {
-        response = await this.requestWithInstanceToken(this.instanceToken, "/instance/connect", { 
-            method: "POST",
-            body: JSON.stringify({})
-        });
-    } else {
-        response = await this.requestWithAdminToken("/instance/connect", { 
-            method: "POST",
-            body: JSON.stringify({ instanceName: name })
-        });
-    }
-    
-    const text = await response.text();
+    let text = "";text = await response.text();
     console.log("UAZAPI connectInstance response text:", text);
     
     let data;

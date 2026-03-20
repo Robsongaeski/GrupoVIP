@@ -32,6 +32,13 @@ export default function AdminApiTest() {
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/auth");
+    
+    // Debug helper to print the UAZAPI token in use
+    const checkConfig = async () => {
+        const { data } = await supabase.from("system_config").select("*").eq("key", "uazapi_admin_token").single();
+        console.log("=== DB UAZAPI TOKEN ===", data?.value ? data.value.substring(0, 10) + "..." : "NULL");
+    }
+    checkConfig();
   }, [user, authLoading, navigate]);
 
   // Handle Instance Creation
