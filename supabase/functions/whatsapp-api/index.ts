@@ -483,10 +483,17 @@ class UazapiAdapter implements IWhatsAppAdapter {
     let response: Response;
     if (this.instanceToken) {
       // With instance token: use /instance/connect (no name in URL)
-      response = await this.requestWithInstanceToken(this.instanceToken, `/instance/connect`, { method: "GET" });
+      // UAZAPI v1.0 requires POST to generate QR code
+      response = await this.requestWithInstanceToken(this.instanceToken, `/instance/connect`, { 
+        method: "POST",
+        body: JSON.stringify({}) 
+      });
     } else {
       // With admin token: use /instance/connect/{name}
-      response = await this.requestWithAdminToken(`/instance/connect/${name}`, { method: "GET" });
+      response = await this.requestWithAdminToken(`/instance/connect/${name}`, { 
+        method: "POST",
+        body: JSON.stringify({})
+      });
     }
     
     const text = await response.text();
@@ -540,10 +547,21 @@ class UazapiAdapter implements IWhatsAppAdapter {
       return { success: false, status: "disconnected", raw: data };
     }
 
-    const stateValue = data.status || data.instance?.status || data.state || "";
+    // UAZAPI v1.0 has a top-level 'status' object AND an 'instance.status' string
+    // We must prioritize the string status or check the object's properties
+    const stateValue = (typeof data.status === "string" ? data.status : null) || 
+                      data.instance?.status || 
+                      data.state || 
+                      "";
+    
     let status: StatusResponse["status"] = "disconnected";
     
-    if (stateValue === "CONNECTED" || stateValue === "open" || stateValue === "connected") status = "connected";
+    // Explicitly check for connected states (string or object flags)
+    const isActuallyConnected = 
+        stateValue === "CONNECTED" || stateValue === "open" || stateValue === "connected" ||
+        data.status?.connected === true || data.status?.loggedIn === true;
+
+    if (isActuallyConnected) status = "connected";
     else if (stateValue === "CONNECTING" || stateValue === "connecting") status = "connecting";
     else if (stateValue === "QRCODE" || stateValue === "qr_pending") status = "qr_pending";
     
@@ -563,16 +581,16 @@ class UazapiAdapter implements IWhatsAppAdapter {
   async sendTextMessage(instanceName: string, groupId: string, text: string): Promise<SendResponse> {
     let response;
     if (this.instanceToken) {
-        response = await this.requestWithInstanceToken(this.instanceToken, "/message/text", {
+        response = await this.requestWithInstanceToken(this.instanceToken, "/send/text", {
             method: "POST",
-            body: JSON.stringify({ phone: groupId, message: text })
+            body: JSON.stringify({ number: groupId, text: text })
         });
     } else {
-        response = await this.requestWithAdminToken(`/message/text`, {
+        response = await this.requestWithAdminToken(`/send/text`, {
           method: "POST",
           body: JSON.stringify({ 
-            phone: groupId,
-            message: text,
+            number: groupId,
+            text: text,
             instanceName 
           }),
         });
@@ -1280,22 +1298,24 @@ Deno.serve(async (req) => {
       }
 
       case "send-text": {
-        if (!body.instanceName || !body.whatsappGroupId || !body.text) {
-          throw new Error("instanceName, whatsappGroupId e text são obrigatórios");
+        const targetId = body.whatsappGroupId || body.groupId;
+        if (!body.instanceName || !targetId || !body.text) {
+          throw new Error("instanceName, target group (groupId/whatsappGroupId) e text são obrigatórios");
         }
 
-        const result = await adapter.sendTextMessage(body.instanceName, body.whatsappGroupId, body.text);
+        const result = await adapter.sendTextMessage(body.instanceName, targetId, body.text);
         return new Response(JSON.stringify(result), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
       case "send-media": {
-        if (!body.instanceName || !body.whatsappGroupId || !body.media) {
-          throw new Error("instanceName, whatsappGroupId e media são obrigatórios");
+        const targetId = body.whatsappGroupId || body.groupId;
+        if (!body.instanceName || !targetId || !body.media) {
+          throw new Error("instanceName, target group (groupId/whatsappGroupId) e media são obrigatórios");
         }
 
-        const result = await adapter.sendMediaMessage(body.instanceName, body.whatsappGroupId, body.media);
+        const result = await adapter.sendMediaMessage(body.instanceName, targetId, body.media);
         return new Response(JSON.stringify(result), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -1320,11 +1340,12 @@ Deno.serve(async (req) => {
       }
 
       case "send-poll": {
-        if (!body.instanceName || !body.whatsappGroupId || !body.poll) {
-          throw new Error("instanceName, whatsappGroupId e poll são obrigatórios");
+        const targetId = body.whatsappGroupId || body.groupId;
+        if (!body.instanceName || !targetId || !body.poll) {
+          throw new Error("instanceName, target group (groupId/whatsappGroupId) e poll são obrigatórios");
         }
 
-        const result = await adapter.sendPollMessage(body.instanceName, body.whatsappGroupId, body.poll);
+        const result = await adapter.sendPollMessage(body.instanceName, targetId, body.poll);
         return new Response(JSON.stringify(result), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
