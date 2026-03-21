@@ -331,13 +331,12 @@ class EvolutionAdapter implements IWhatsAppAdapter {
   async testConnection(): Promise<{ success: boolean; message: string; instanceCount?: number }> {
     try {
       const response = await this.request("/instance/fetchInstances", { method: "GET" });
+      const data = await response.json();
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        return { success: false, message: errorData.message || `Erro HTTP ${response.status}` };
+        return { success: false, message: data.message || `Erro HTTP ${response.status}` };
       }
 
-      const data = await response.json();
       const count = Array.isArray(data) ? data.length : 0;
       return { success: true, message: `Conexão bem sucedida! ${count} instâncias encontradas.`, instanceCount: count };
     } catch (error) {

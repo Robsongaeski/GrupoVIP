@@ -604,17 +604,17 @@ export default function AdminConfig() {
           </CardContent>
         </Card>
 
-        {/* Save Button */}
-        <div className="flex justify-end">
-          <Button onClick={handleSave} disabled={saving}>
+        {/* Sticky Save Button Bar */}
+        <div className="sticky bottom-4 mt-8 flex justify-end bg-background/80 backdrop-blur-md p-4 rounded-xl border shadow-lg z-50">
+          <Button onClick={handleSave} disabled={saving} size="lg" className="shadow-md">
             {saving ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Salvando...
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                Salvando Alterações...
               </>
             ) : (
               <>
-                <Save className="mr-2 h-4 w-4" />
+                <Save className="mr-2 h-5 w-5" />
                 Salvar Configurações
               </>
             )}
