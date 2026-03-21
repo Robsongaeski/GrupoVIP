@@ -188,7 +188,7 @@ export default function Groups() {
         return;
       }
 
-      const response = await supabase.functions.invoke("evolution-api", {
+      const response = await supabase.functions.invoke("whatsapp-api", {
         body: {
           action: "fetch-groups",
           instanceId: selectedInstance,

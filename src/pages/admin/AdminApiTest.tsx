@@ -63,14 +63,18 @@ export default function AdminApiTest() {
       if (error) throw new Error(error.message);
       if (!data.success) throw new Error(data.error || "Erro ao criar instância");
 
-      if (data.instanceToken) {
-        setInstanceToken(data.instanceToken);
+      // Get the instanceToken returned by the API (critical for UAZAPI)
+      const receivedToken = data.instanceToken || "";
+      
+      if (receivedToken) {
+        setInstanceToken(receivedToken);
       }
       
       setInstanceName(newName); // Only set if successful
 
       toast.success("Instância de teste criada. Solicitando conexão...");
-      await handleConnectInstance(newName, data.instanceToken);
+      // Pass token explicitly to avoid React state timing issues
+      await handleConnectInstance(newName, receivedToken);
 
     } catch (err: any) {
       console.error("Criar instância erro:", err);
@@ -83,12 +87,14 @@ export default function AdminApiTest() {
   // Handle get connection / QR
   const handleConnectInstance = async (name: string, tokenOverride?: string) => {
     setLoading(true);
+    // Use tokenOverride first (avoids React state timing issues), then fall back to state
+    const effectiveToken = tokenOverride ?? instanceToken;
     try {
       const { data, error } = await supabase.functions.invoke("whatsapp-api", {
         body: { 
           action: "connect", 
           instanceName: name,
-          instanceToken: tokenOverride || instanceToken,
+          instanceToken: effectiveToken,
           providerOverride: provider 
         }
       });
@@ -98,7 +104,7 @@ export default function AdminApiTest() {
       if (data.status === "connected" || data.status === "open") {
         setStatus("connected");
         toast.success("Instância já está conectada!");
-        checkStatus(name);
+        checkStatus(name, effectiveToken);
       } else if (data.qrcode) {
         // Ensure QR code is a valid data URI
         let qrcode = data.qrcode;
@@ -108,25 +114,70 @@ export default function AdminApiTest() {
         setQrCode(qrcode);
         setStatus("qr_pending");
       } else {
+        // UAZAPI may take a few seconds to initialize and generate the QR code
+        // Poll for QR code up to 5 times every 3 seconds
         setStatus(data.status || "connecting");
+        toast.info("Instância inicializando, aguardando QR Code...");
+        pollForQrCode(name, effectiveToken);
       }
     } catch (err: any) {
       console.error(err);
-      toast.error("Erro ao obtrer QR Code.");
+      toast.error("Erro ao obter QR Code.");
     } finally {
       setLoading(false);
     }
   };
 
+  // Poll for QR Code when UAZAPI is initializing
+  const pollForQrCode = async (name: string, token: string, attempt = 1) => {
+    if (attempt > 5) {
+      toast.error("Timeout: QR Code não foi gerado. Tente recriar a instância.");
+      return;
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3s
+
+    try {
+      const { data } = await supabase.functions.invoke("whatsapp-api", {
+        body: {
+          action: "connect",
+          instanceName: name,
+          instanceToken: token,
+          providerOverride: provider
+        }
+      });
+
+      if (data?.qrcode) {
+        let qrcode = data.qrcode;
+        if (qrcode && typeof qrcode === "string" && !qrcode.startsWith("data:")) {
+          qrcode = `data:image/png;base64,${qrcode}`;
+        }
+        setQrCode(qrcode);
+        setStatus("qr_pending");
+        toast.success("QR Code gerado! Escaneie com seu WhatsApp.");
+      } else if (data?.status === "connected" || data?.status === "open") {
+        setStatus("connected");
+        toast.success("Instância já está conectada!");
+      } else {
+        // Try again
+        pollForQrCode(name, token, attempt + 1);
+      }
+    } catch (err) {
+      console.error("Poll error:", err);
+    }
+  };
+
   // Check Status Periodic
-  const checkStatus = async (name: string = instanceName) => {
+  // tokenParam is passed explicitly to avoid React state timing issues (stale closure)
+  const checkStatus = async (name: string = instanceName, tokenParam?: string) => {
     if (!name) return;
+    const effectiveToken = tokenParam ?? instanceToken;
     try {
       const { data, error } = await supabase.functions.invoke("whatsapp-api", {
         body: { 
           action: "status", 
           instanceName: name,
-          instanceToken: instanceToken,
+          instanceToken: effectiveToken,
           providerOverride: provider 
         }
       });

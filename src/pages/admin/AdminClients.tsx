@@ -214,20 +214,20 @@ export default function AdminClients() {
 
   const deleteUserInstancesFromEvolution = async (userId: string) => {
     try {
-      console.log(`Removing Evolution API instances for user ${userId}`);
-      const response = await supabase.functions.invoke("evolution-api", {
+      console.log(`Removing WhatsApp API instances for user ${userId}`);
+      const response = await supabase.functions.invoke("whatsapp-api", {
         body: { action: "delete-by-user", userId },
       });
 
       if (response.error) {
-        console.error("Error removing instances from Evolution API:", response.error);
+        console.error("Error removing instances from WhatsApp API:", response.error);
         return { success: false, error: response.error.message };
       }
 
-      console.log("Evolution API instances removal result:", response.data);
+      console.log("WhatsApp API instances removal result:", response.data);
       return { success: true, data: response.data };
     } catch (error) {
-      console.error("Error calling evolution-api:", error);
+      console.error("Error calling whatsapp-api:", error);
       return { success: false, error: (error as Error).message };
     }
   };

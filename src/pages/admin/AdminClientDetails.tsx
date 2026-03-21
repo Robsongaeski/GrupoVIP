@@ -432,7 +432,7 @@ export default function AdminClientDetails() {
     setActionLoading(true);
     try {
       if (stats && stats.instances_count > 0) {
-        await supabase.functions.invoke("evolution-api", {
+        await supabase.functions.invoke("whatsapp-api", {
           body: { action: "delete-by-user", userId: client.id },
         });
       }

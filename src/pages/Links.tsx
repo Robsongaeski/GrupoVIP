@@ -256,7 +256,7 @@ export default function Links() {
   const handleFetchInviteCode = async (group: Group) => {
     setFetchingInvite(group.id);
     try {
-      const { data, error } = await supabase.functions.invoke("evolution-api", {
+      const { data, error } = await supabase.functions.invoke("whatsapp-api", {
         body: {
           action: "fetch-invite-code",
           groupId: group.id,

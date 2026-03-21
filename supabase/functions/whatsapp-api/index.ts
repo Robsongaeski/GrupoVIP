@@ -476,12 +476,18 @@ class UazapiAdapter implements IWhatsAppAdapter {
   }
 
   async connectInstance(name: string): Promise<ConnectResponse> {
-    // We use GET /instance/connect with admintoken since it reliably returns the QR code
-    // compared to POST /instance/connect which sometimes only returns state.
-    console.log(`UAZAPI: Requesting connection for instance ${name}...`);
-    const response = await this.request(`/instance/connect/${name}`, { 
-        method: "GET"
-    });
+    // Use instanceToken for instance-specific operations if available
+    // UAZAPI requires instance token for /instance/connect when authenticated per-instance
+    console.log(`UAZAPI: Requesting connection for instance ${name}, hasToken=${!!this.instanceToken}`);
+    
+    let response: Response;
+    if (this.instanceToken) {
+      // With instance token: use /instance/connect (no name in URL)
+      response = await this.requestWithInstanceToken(this.instanceToken, `/instance/connect`, { method: "GET" });
+    } else {
+      // With admin token: use /instance/connect/{name}
+      response = await this.requestWithAdminToken(`/instance/connect/${name}`, { method: "GET" });
+    }
     
     const text = await response.text();
     console.log(`UAZAPI connectInstance response (${response.status}):`, text);
@@ -796,7 +802,8 @@ interface WhatsAppApiRequest {
     | "send-text"
     | "send-media"
     | "send-poll"
-    | "configure-settings";
+    | "configure-settings"
+    | "logout";
   instanceId?: string;
   instanceName?: string;
   instanceToken?: string;
@@ -907,7 +914,13 @@ Deno.serve(async (req) => {
           throw new Error(result.error);
         }
 
-        return new Response(JSON.stringify({ success: true, data: result.data }), {
+        // Include instanceToken in response - UAZAPI returns a unique token per instance
+        // The frontend must store and send this token in all subsequent calls
+        return new Response(JSON.stringify({ 
+          success: true, 
+          data: result.data,
+          instanceToken: result.instanceToken || null,
+        }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -1313,6 +1326,24 @@ Deno.serve(async (req) => {
 
         const result = await adapter.sendPollMessage(body.instanceName, body.whatsappGroupId, body.poll);
         return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // logout is an alias for disconnect that works with instanceName directly (no DB lookup)
+      // Used by the simulator (AdminApiTest) which manages temporary instances outside the DB
+      case "logout": {
+        const instanceNameToLogout = body.instanceName;
+        if (!instanceNameToLogout) {
+          throw new Error("instanceName é obrigatório para logout");
+        }
+        try {
+          await adapter.logoutInstance(instanceNameToLogout);
+          await adapter.deleteInstance(instanceNameToLogout);
+        } catch (e) {
+          console.error("logout cleanup error (non-fatal):", e);
+        }
+        return new Response(JSON.stringify({ success: true }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }

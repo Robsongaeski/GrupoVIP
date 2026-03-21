@@ -111,7 +111,7 @@ export default function Instances() {
   };
 
   const callEvolutionApi = async (action: string, data: Record<string, unknown> = {}) => {
-    const response = await supabase.functions.invoke("evolution-api", {
+    const response = await supabase.functions.invoke("whatsapp-api", {
       body: { action, ...data },
     });
 
