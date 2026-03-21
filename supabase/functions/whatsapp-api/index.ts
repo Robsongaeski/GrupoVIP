@@ -460,7 +460,7 @@ class UazapiAdapter implements IWhatsAppAdapter {
       return { 
       success: true, 
       instanceName: name, 
-      instanceToken: data.token, // Important: save this token!
+      instanceToken: data.token || data.inst_token || data.instanceToken, // Support various UAZAPI versions
       data 
     };
   }
@@ -478,12 +478,13 @@ class UazapiAdapter implements IWhatsAppAdapter {
   async connectInstance(name: string): Promise<ConnectResponse> {
     // We use GET /instance/connect with admintoken since it reliably returns the QR code
     // compared to POST /instance/connect which sometimes only returns state.
+    console.log(`UAZAPI: Requesting connection for instance ${name}...`);
     const response = await this.request(`/instance/connect/${name}`, { 
         method: "GET"
     });
     
-    let text = "";text = await response.text();
-    console.log("UAZAPI connectInstance response text:", text);
+    const text = await response.text();
+    console.log(`UAZAPI connectInstance response (${response.status}):`, text);
     
     let data;
     try {
@@ -493,11 +494,22 @@ class UazapiAdapter implements IWhatsAppAdapter {
     }
 
     const status = data.status || data.instance?.status || "";
-    if (status === "connected" || status === "CONNECTED") {
+    if (status === "connected" || status === "CONNECTED" || status === "open") {
       return { success: true, status: "connected", message: "Já conectado!" };
     }
 
     let qrcode = data.qrcode || data.instance?.qrcode || data.base64 || "";
+    
+    // Fallback: If no QR code in connect response, try checking status
+    if (!qrcode) {
+        console.log(`UAZAPI: No QR code in connect response, checking status...`);
+        const statusRes = await this.getInstanceStatus(name);
+        console.log(`UAZAPI status fallback result:`, JSON.stringify(statusRes.raw));
+        if (statusRes.raw?.qrcode || statusRes.raw?.instance?.qrcode || statusRes.raw?.base64) {
+            qrcode = statusRes.raw.qrcode || statusRes.raw.instance?.qrcode || statusRes.raw.base64;
+        }
+    }
+
     if (qrcode && !qrcode.startsWith("data:")) {
       qrcode = `data:image/png;base64,${qrcode}`;
     }
@@ -783,7 +795,8 @@ interface WhatsAppApiRequest {
     | "fetch-invite-code"
     | "send-text"
     | "send-media"
-    | "send-poll";
+    | "send-poll"
+    | "configure-settings";
   instanceId?: string;
   instanceName?: string;
   instanceToken?: string;
