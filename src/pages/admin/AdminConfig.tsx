@@ -63,11 +63,16 @@ export default function AdminConfig() {
   };
 
   const handleUpdateConfig = (key: string, value: string) => {
-    setConfigs(prev => 
-      prev.map(config => 
-        config.key === key ? { ...config, value } : config
-      )
-    );
+    setConfigs(prev => {
+      const exists = prev.some(c => c.key === key);
+      if (exists) {
+        return prev.map(config => 
+          config.key === key ? { ...config, value } : config
+        );
+      } else {
+        return [...prev, { key, value, description: "", is_secret: key.includes("token") || key.includes("key") }];
+      }
+    });
   };
 
   const handleSave = async () => {
@@ -95,8 +100,12 @@ export default function AdminConfig() {
 
         const { error } = await supabase
           .from("system_config")
-          .update({ value: config.value })
-          .eq("key", config.key);
+          .upsert({ 
+            key: config.key, 
+            value: config.value,
+            description: config.description || "",
+            is_secret: config.is_secret || false
+          }, { onConflict: 'key' });
 
         if (error) throw error;
       }
